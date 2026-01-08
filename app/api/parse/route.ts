@@ -12,16 +12,82 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Получаем HTML страницы
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    // Валидация и нормализация URL
+    let normalizedUrl = url.trim()
+    try {
+      const urlObj = new URL(normalizedUrl)
+      // Проверяем, что это http или https
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        return NextResponse.json(
+          { error: 'URL должен использовать протокол HTTP или HTTPS' },
+          { status: 400 }
+        )
       }
-    })
+      normalizedUrl = urlObj.toString()
+    } catch (urlError) {
+      return NextResponse.json(
+        { error: 'Некорректный URL. Убедитесь, что URL начинается с http:// или https://' },
+        { status: 400 }
+      )
+    }
+
+    // Получаем HTML страницы
+    let response: Response
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 секунд
+    
+    try {
+      response = await fetch(normalizedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Connection': 'keep-alive',
+        },
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError' || fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
+          return NextResponse.json(
+            { error: 'Request timeout: URL не отвечает в течение 30 секунд' },
+            { status: 408 }
+          )
+        }
+        if (fetchError.message.includes('CORS') || fetchError.message.includes('cors')) {
+          return NextResponse.json(
+            { error: 'CORS error: Доступ к URL заблокирован политикой безопасности' },
+            { status: 403 }
+          )
+        }
+        if (fetchError.message.includes('ENOTFOUND') || fetchError.message.includes('getaddrinfo')) {
+          return NextResponse.json(
+            { error: 'DNS error: Не удалось найти сервер. Проверьте правильность URL' },
+            { status: 404 }
+          )
+        }
+        if (fetchError.message.includes('ECONNREFUSED')) {
+          return NextResponse.json(
+            { error: 'Connection refused: Сервер отклонил подключение' },
+            { status: 503 }
+          )
+        }
+        return NextResponse.json(
+          { error: `Ошибка при загрузке страницы: ${fetchError.message}` },
+          { status: 500 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Неизвестная ошибка при загрузке страницы' },
+        { status: 500 }
+      )
+    }
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Failed to fetch URL: ${response.statusText}` },
+        { error: `HTTP ${response.status}: ${response.statusText}` },
         { status: response.status }
       )
     }
