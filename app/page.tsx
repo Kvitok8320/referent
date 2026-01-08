@@ -2,13 +2,55 @@
 
 import { useState } from 'react'
 
-type ActionType = 'summary' | 'theses' | 'telegram' | null
+type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | null
+
+interface ParsedData {
+  date: string | null
+  title: string | null
+  content: string | null
+}
 
 export default function Home() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [actionType, setActionType] = useState<ActionType>(null)
+  const [parsedData, setParsedData] = useState<ParsedData | null>(null)
+
+  const handleParse = async () => {
+    if (!url.trim()) {
+      alert('Пожалуйста, введите URL статьи')
+      return
+    }
+
+    setLoading(true)
+    setActionType('parse')
+    setResult('')
+    setParsedData(null)
+
+    try {
+      const response = await fetch('/api/parse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url.trim() }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to parse article')
+      }
+
+      const data: ParsedData = await response.json()
+      setParsedData(data)
+      setResult(JSON.stringify(data, null, 2))
+    } catch (error) {
+      setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleAction = async (type: ActionType) => {
     if (!url.trim()) {
@@ -50,6 +92,18 @@ export default function Home() {
           />
         </div>
 
+        {/* Кнопка парсинга */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Парсинг статьи:</h2>
+          <button
+            onClick={handleParse}
+            disabled={loading}
+            className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
+          >
+            {loading && actionType === 'parse' ? 'Парсинг...' : 'Распарсить статью'}
+          </button>
+        </div>
+
         {/* Кнопки действий */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Выберите действие:</h2>
@@ -81,6 +135,7 @@ export default function Home() {
         {/* Блок отображения результата */}
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">
+            {actionType === 'parse' && 'Результат парсинга'}
             {actionType === 'summary' && 'О чем статья?'}
             {actionType === 'theses' && 'Тезисы'}
             {actionType === 'telegram' && 'Пост для Telegram'}
@@ -93,7 +148,15 @@ export default function Home() {
                 <span className="ml-4 text-gray-600">Генерация результата...</span>
               </div>
             ) : result ? (
-              <div className="text-gray-700 whitespace-pre-wrap">{result}</div>
+              <div className="text-gray-700">
+                {actionType === 'parse' ? (
+                  <pre className="bg-white p-4 rounded border overflow-auto max-h-[500px] text-sm">
+                    {result}
+                  </pre>
+                ) : (
+                  <div className="whitespace-pre-wrap">{result}</div>
+                )}
+              </div>
             ) : (
               <div className="text-gray-400 text-center py-12">
                 Выберите действие для отображения результата
