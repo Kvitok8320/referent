@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import cheerio from 'cheerio'
+import * as cheerio from 'cheerio'
 
 export async function POST(request: NextRequest) {
+  console.log('API /api/parse вызван')
   try {
-    const { url } = await request.json()
+    const body = await request.json()
+    console.log('Тело запроса:', body)
+    const { url } = body
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
@@ -37,50 +40,80 @@ export async function POST(request: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 секунд
     
     try {
+      console.log('Попытка загрузки URL:', normalizedUrl)
       response = await fetch(normalizedUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
         },
         signal: controller.signal,
+        redirect: 'follow',
+        // Добавляем опции для работы с различными сайтами
+        cache: 'no-store',
       })
       clearTimeout(timeoutId)
+      console.log('Ответ получен, status:', response.status, response.statusText)
     } catch (fetchError) {
       clearTimeout(timeoutId)
+      console.error('Fetch error details:', {
+        error: fetchError,
+        name: fetchError instanceof Error ? fetchError.name : 'Unknown',
+        message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        stack: fetchError instanceof Error ? fetchError.stack : undefined,
+        url: normalizedUrl
+      })
+      
       if (fetchError instanceof Error) {
-        if (fetchError.name === 'AbortError' || fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
+        const errorMessage = fetchError.message.toLowerCase()
+        const errorName = fetchError.name.toLowerCase()
+        
+        if (errorName === 'aborterror' || errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
           return NextResponse.json(
             { error: 'Request timeout: URL не отвечает в течение 30 секунд' },
             { status: 408 }
           )
         }
-        if (fetchError.message.includes('CORS') || fetchError.message.includes('cors')) {
+        if (errorMessage.includes('cors') || errorMessage.includes('cross-origin')) {
           return NextResponse.json(
             { error: 'CORS error: Доступ к URL заблокирован политикой безопасности' },
             { status: 403 }
           )
         }
-        if (fetchError.message.includes('ENOTFOUND') || fetchError.message.includes('getaddrinfo')) {
+        if (errorMessage.includes('enotfound') || errorMessage.includes('getaddrinfo') || errorMessage.includes('dns')) {
           return NextResponse.json(
             { error: 'DNS error: Не удалось найти сервер. Проверьте правильность URL' },
             { status: 404 }
           )
         }
-        if (fetchError.message.includes('ECONNREFUSED')) {
+        if (errorMessage.includes('econnrefused') || errorMessage.includes('connection refused')) {
           return NextResponse.json(
             { error: 'Connection refused: Сервер отклонил подключение' },
             { status: 503 }
           )
         }
+        if (errorMessage.includes('certificate') || errorMessage.includes('ssl') || errorMessage.includes('tls')) {
+          return NextResponse.json(
+            { error: 'SSL/TLS error: Проблема с сертификатом безопасности. Попробуйте другой URL' },
+            { status: 495 }
+          )
+        }
+        if (errorMessage.includes('fetch failed') || errorMessage.includes('network')) {
+          return NextResponse.json(
+            { error: `Ошибка сети: ${fetchError.message}. Проверьте подключение к интернету и правильность URL` },
+            { status: 500 }
+          )
+        }
         return NextResponse.json(
-          { error: `Ошибка при загрузке страницы: ${fetchError.message}` },
+          { error: `Ошибка при загрузке страницы: ${fetchError.message} (${fetchError.name})` },
           { status: 500 }
         )
       }
       return NextResponse.json(
-        { error: 'Неизвестная ошибка при загрузке страницы' },
+        { error: `Неизвестная ошибка при загрузке страницы: ${String(fetchError)}` },
         { status: 500 }
       )
     }

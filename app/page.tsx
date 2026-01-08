@@ -17,7 +17,12 @@ export default function Home() {
   const [actionType, setActionType] = useState<ActionType>(null)
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
 
-  const handleParse = async () => {
+  const handleParse = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    
+    console.log('handleParse вызван, URL:', url)
+    
     if (!url.trim()) {
       alert('Пожалуйста, введите URL статьи')
       return
@@ -29,6 +34,7 @@ export default function Home() {
     setParsedData(null)
 
     try {
+      console.log('Отправка запроса на /api/parse с URL:', url.trim())
       const response = await fetch('/api/parse', {
         method: 'POST',
         headers: {
@@ -37,15 +43,20 @@ export default function Home() {
         body: JSON.stringify({ url: url.trim() }),
       })
 
+      console.log('Ответ получен, status:', response.status)
+
       if (!response.ok) {
         const error = await response.json()
+        console.error('Ошибка API:', error)
         throw new Error(error.error || 'Failed to parse article')
       }
 
       const data: ParsedData = await response.json()
+      console.log('Данные получены:', data)
       setParsedData(data)
       setResult(JSON.stringify(data, null, 2))
     } catch (error) {
+      console.error('Ошибка в handleParse:', error)
       setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
@@ -87,6 +98,11 @@ export default function Home() {
             type="url"
             value={url}
             onChange={(e) => setUrl((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !loading && url.trim()) {
+                handleParse()
+              }
+            }}
             placeholder="https://example.com/article"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
@@ -96,7 +112,11 @@ export default function Home() {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Парсинг статьи:</h2>
           <button
-            onClick={handleParse}
+            type="button"
+            onClick={(e) => {
+              console.log('Кнопка нажата')
+              handleParse(e)
+            }}
             disabled={loading}
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
           >
