@@ -17,12 +17,16 @@ export default function Home() {
   const [actionType, setActionType] = useState<ActionType>(null)
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
 
+<<<<<<< HEAD
   const handleParse = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault()
     e?.stopPropagation()
     
     console.log('handleParse вызван, URL:', url)
     
+=======
+  const handleParse = async () => {
+>>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
     if (!url.trim()) {
       alert('Пожалуйста, введите URL статьи')
       return
@@ -34,7 +38,10 @@ export default function Home() {
     setParsedData(null)
 
     try {
+<<<<<<< HEAD
       console.log('Отправка запроса на /api/parse с URL:', url.trim())
+=======
+>>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
       const response = await fetch('/api/parse', {
         method: 'POST',
         headers: {
@@ -43,20 +50,31 @@ export default function Home() {
         body: JSON.stringify({ url: url.trim() }),
       })
 
+<<<<<<< HEAD
       console.log('Ответ получен, status:', response.status)
 
       if (!response.ok) {
         const error = await response.json()
         console.error('Ошибка API:', error)
+=======
+      if (!response.ok) {
+        const error = await response.json()
+>>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
         throw new Error(error.error || 'Failed to parse article')
       }
 
       const data: ParsedData = await response.json()
+<<<<<<< HEAD
       console.log('Данные получены:', data)
       setParsedData(data)
       setResult(JSON.stringify(data, null, 2))
     } catch (error) {
       console.error('Ошибка в handleParse:', error)
+=======
+      setParsedData(data)
+      setResult(JSON.stringify(data, null, 2))
+    } catch (error) {
+>>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
       setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
@@ -112,11 +130,15 @@ export default function Home() {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Парсинг статьи:</h2>
           <button
+<<<<<<< HEAD
             type="button"
             onClick={(e) => {
               console.log('Кнопка нажата')
               handleParse(e)
             }}
+=======
+            onClick={handleParse}
+>>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
             disabled={loading}
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
           >
