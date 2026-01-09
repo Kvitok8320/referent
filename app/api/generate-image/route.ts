@@ -24,22 +24,77 @@ export async function POST(request: NextRequest) {
     }
 
     // Используем Hugging Face Inference API для генерации изображения
-    // Популярная модель для генерации изображений: stabilityai/stable-diffusion-xl-base-1.0
-    const model = 'stabilityai/stable-diffusion-xl-base-1.0'
+    // Попробуем несколько моделей, начиная с наиболее популярной
+    const models = [
+      'stabilityai/stable-diffusion-xl-base-1.0',
+      'runwayml/stable-diffusion-v1-5',
+      'CompVis/stable-diffusion-v1-4'
+    ]
     
+    // Используем первый доступный вариант
+    const model = models[0]
     console.log('Отправка запроса на генерацию изображения в Hugging Face, модель:', model)
 
-    // Используем новый endpoint router.huggingface.co вместо api-inference.huggingface.co
-    const response = await fetch(`https://router.huggingface.co/models/${model}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        inputs: prompt,
-      }),
-    })
+    // Пробуем несколько вариантов URL для нового endpoint
+    // Вариант 1: https://router.huggingface.co/hf-inference/models/{model}
+    // Вариант 2: https://router.huggingface.co/models/{model} (без /hf-inference/)
+    // Вариант 3: Старый endpoint (может все еще работать для некоторых моделей)
+    const apiUrls = [
+      `https://router.huggingface.co/hf-inference/models/${model}`,
+      `https://router.huggingface.co/models/${model}`,
+      `https://api-inference.huggingface.co/models/${model}`
+    ]
+    
+    let response: Response | null = null
+    let lastError: any = null
+    
+    // Пробуем каждый URL по очереди
+    for (const apiUrl of apiUrls) {
+      try {
+        console.log('Попытка запроса к:', apiUrl)
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+          }),
+        })
+        
+        // Если получили успешный ответ или ошибку, которая не 404, используем этот URL
+        if (response.ok || (response.status !== 404 && response.status !== 400)) {
+          console.log('Успешный запрос к:', apiUrl, 'статус:', response.status)
+          break
+        }
+        
+        // Если 404, пробуем следующий URL
+        if (response.status === 404) {
+          console.log('404 ошибка для:', apiUrl, 'пробуем следующий URL')
+          const errorText = await response.text().catch(() => '')
+          lastError = { status: 404, message: errorText || 'Not Found', url: apiUrl }
+          response = null
+          continue
+        }
+        
+        // Для других ошибок останавливаемся
+        break
+      } catch (fetchError) {
+        console.error('Ошибка при запросе к:', apiUrl, fetchError)
+        lastError = fetchError
+        response = null
+        continue
+      }
+    }
+    
+    // Если все URL вернули ошибку, используем последний ответ или ошибку
+    if (!response) {
+      return NextResponse.json(
+        { error: `Не удалось подключиться к Hugging Face API. Все варианты URL недоступны. Последняя ошибка: ${lastError?.message || 'Unknown error'}` },
+        { status: 500 }
+      )
+    }
 
     if (!response.ok) {
       let errorData: any = {}
@@ -67,6 +122,8 @@ export async function POST(request: NextRequest) {
       let errorMessage = 'Ошибка при обращении к Hugging Face API'
       if (response.status === 401) {
         errorMessage = 'Неверный API ключ Hugging Face. Проверьте правильность ключа в .env.local'
+      } else if (response.status === 404) {
+        errorMessage = `Модель ${model} не найдена или недоступна через Inference API. Попробуйте другую модель или проверьте доступность модели на Hugging Face.`
       } else if (response.status === 503) {
         errorMessage = 'Модель загружается. Подождите немного и попробуйте снова.'
       } else if (response.status === 429) {
@@ -78,6 +135,12 @@ export async function POST(request: NextRequest) {
       } else if (typeof errorData === 'string') {
         errorMessage = `Ошибка Hugging Face: ${errorData}`
       }
+      
+      console.error('Полная информация об ошибке:', {
+        url: apiUrl,
+        status: response.status,
+        errorData: errorData
+      })
       
       return NextResponse.json(
         { error: errorMessage },
