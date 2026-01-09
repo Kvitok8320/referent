@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 
 type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | 'translate' | null
 
@@ -10,12 +11,117 @@ interface ParsedData {
   content: string | null
 }
 
+interface ErrorState {
+  message: string
+  variant: 'default' | 'destructive' | 'warning' | 'info'
+}
+
+// Функция для преобразования ошибок в дружественные сообщения
+function getFriendlyErrorMessage(error: any, actionType: ActionType, statusCode?: number): ErrorState {
+  // Ошибки загрузки статьи (404, 500, таймаут и т.п.)
+  if (actionType === 'parse') {
+    if (statusCode === 404 || statusCode === 500 || statusCode === 408 || statusCode === 503) {
+      return {
+        message: 'Не удалось загрузить статью по этой ссылке.',
+        variant: 'destructive'
+      }
+    }
+    if (statusCode === 403) {
+      return {
+        message: 'Доступ к статье заблокирован. Возможно, сайт защищен от автоматического доступа.',
+        variant: 'destructive'
+      }
+    }
+    if (error?.message?.toLowerCase().includes('timeout') || error?.message?.toLowerCase().includes('таймаут')) {
+      return {
+        message: 'Не удалось загрузить статью по этой ссылке. Превышено время ожидания.',
+        variant: 'destructive'
+      }
+    }
+    if (error?.message?.toLowerCase().includes('dns') || error?.message?.toLowerCase().includes('enotfound')) {
+      return {
+        message: 'Не удалось загрузить статью по этой ссылке. Проверьте правильность URL.',
+        variant: 'destructive'
+      }
+    }
+    if (error?.message?.toLowerCase().includes('cors')) {
+      return {
+        message: 'Не удалось загрузить статью по этой ссылке. Доступ заблокирован политикой безопасности.',
+        variant: 'destructive'
+      }
+    }
+  }
+
+  // Ошибки API ключа
+  if (error?.message?.toLowerCase().includes('api key') || error?.message?.toLowerCase().includes('api ключ')) {
+    return {
+      message: 'Ошибка настройки API. Обратитесь к администратору.',
+      variant: 'destructive'
+    }
+  }
+
+  // Ошибки перевода
+  if (actionType === 'translate') {
+    if (statusCode === 401) {
+      return {
+        message: 'Ошибка авторизации при переводе. Проверьте настройки API.',
+        variant: 'destructive'
+      }
+    }
+    return {
+      message: 'Не удалось перевести статью. Попробуйте еще раз.',
+      variant: 'destructive'
+    }
+  }
+
+  // Ошибки генерации контента
+  if (actionType === 'summary' || actionType === 'theses' || actionType === 'telegram') {
+    if (statusCode === 401) {
+      return {
+        message: 'Ошибка авторизации. Проверьте настройки API.',
+        variant: 'destructive'
+      }
+    }
+    if (statusCode === 429) {
+      return {
+        message: 'Превышен лимит запросов. Подождите немного и попробуйте снова.',
+        variant: 'warning'
+      }
+    }
+    if (error?.message?.toLowerCase().includes('слишком короткий')) {
+      return {
+        message: 'Контент статьи слишком короткий для обработки. Попробуйте другую статью.',
+        variant: 'warning'
+      }
+    }
+    return {
+      message: `Не удалось ${actionType === 'summary' ? 'сгенерировать краткое содержание' : actionType === 'theses' ? 'сгенерировать тезисы' : 'создать Telegram-пост'}. Попробуйте еще раз.`,
+      variant: 'destructive'
+    }
+  }
+
+  // Общие ошибки сети
+  if (error?.message?.toLowerCase().includes('network') || error?.message?.toLowerCase().includes('fetch')) {
+    return {
+      message: 'Ошибка сети. Проверьте подключение к интернету.',
+      variant: 'destructive'
+    }
+  }
+
+  // Общие ошибки
+  return {
+    message: 'Произошла ошибка. Попробуйте еще раз.',
+    variant: 'destructive'
+  }
+}
+
 export default function Home() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [actionType, setActionType] = useState<ActionType>(null)
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
+  const [error, setError] = useState<ErrorState | null>(null)
 
   const handleParse = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault()
@@ -32,6 +138,7 @@ export default function Home() {
     setActionType('parse')
     setResult('')
     setParsedData(null)
+    setError(null)
 
     try {
       console.log('Отправка запроса на /api/parse с URL:', url.trim())
@@ -46,18 +153,27 @@ export default function Home() {
       console.log('Ответ получен, status:', response.status)
 
       if (!response.ok) {
-        const error = await response.json()
-        console.error('Ошибка API:', error)
-        throw new Error(error.error || 'Failed to parse article')
+        let errorData: any = {}
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          // Если не удалось распарсить JSON, используем статус код
+        }
+        console.error('Ошибка API:', errorData)
+        const friendlyError = getFriendlyErrorMessage(errorData, 'parse', response.status)
+        setError(friendlyError)
+        return
       }
 
       const data: ParsedData = await response.json()
       console.log('Данные получены:', data)
       setParsedData(data)
       setResult(JSON.stringify(data, null, 2))
+      setError(null)
     } catch (error) {
       console.error('Ошибка в handleParse:', error)
-      setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+      const friendlyError = getFriendlyErrorMessage(error, 'parse')
+      setError(friendlyError)
     } finally {
       setLoading(false)
     }
@@ -72,6 +188,7 @@ export default function Home() {
     setLoading(true)
     setActionType('translate')
     setResult('')
+    setError(null)
 
     try {
       console.log('Отправка запроса на перевод')
@@ -86,17 +203,26 @@ export default function Home() {
       console.log('Ответ получен, status:', response.status)
 
       if (!response.ok) {
-        const error = await response.json()
-        console.error('Ошибка API:', error)
-        throw new Error(error.error || 'Failed to translate article')
+        let errorData: any = {}
+        try {
+          errorData = await response.json()
+        } catch (e) {
+          // Если не удалось распарсить JSON, используем статус код
+        }
+        console.error('Ошибка API:', errorData)
+        const friendlyError = getFriendlyErrorMessage(errorData, 'translate', response.status)
+        setError(friendlyError)
+        return
       }
 
       const data = await response.json()
       console.log('Перевод получен')
       setResult(data.translation || 'Перевод не получен')
+      setError(null)
     } catch (error) {
       console.error('Ошибка в handleTranslate:', error)
-      setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+      const friendlyError = getFriendlyErrorMessage(error, 'translate')
+      setError(friendlyError)
     } finally {
       setLoading(false)
     }
@@ -111,6 +237,7 @@ export default function Home() {
     setLoading(true)
     setActionType(type)
     setResult('')
+    setError(null)
 
     try {
       const endpoint = `/api/${type}`
@@ -138,25 +265,27 @@ export default function Home() {
       console.log('Ответ получен, status:', response.status)
 
       if (!response.ok) {
-        let errorMessage = 'Ошибка при обработке запроса'
+        let errorData: any = {}
         try {
-          const error = await response.json()
-          errorMessage = error.error || `Ошибка ${response.status}: ${response.statusText}`
-          console.error('Ошибка API:', error)
+          errorData = await response.json()
         } catch (e) {
-          errorMessage = `Ошибка ${response.status}: ${response.statusText}`
-          console.error('Не удалось прочитать ошибку:', e)
+          // Если не удалось распарсить JSON, используем статус код
         }
-        throw new Error(errorMessage)
+        console.error('Ошибка API:', errorData)
+        const friendlyError = getFriendlyErrorMessage(errorData, type, response.status)
+        setError(friendlyError)
+        return
       }
 
       const data = await response.json()
       const resultKey = type === 'summary' ? 'summary' : type === 'theses' ? 'theses' : 'post'
       console.log('Результат получен:', resultKey)
       setResult(data[resultKey] || 'Результат не получен')
+      setError(null)
     } catch (error) {
       console.error(`Ошибка в handleAction (${type}):`, error)
-      setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+      const friendlyError = getFriendlyErrorMessage(error, type)
+      setError(friendlyError)
     } finally {
       setLoading(false)
     }
@@ -256,6 +385,16 @@ export default function Home() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Блок ошибок */}
+        {error && (
+          <Alert variant={error.variant} className="mb-6">
+            <AlertTitle className="mb-1">
+              {error.variant === 'destructive' ? 'Ошибка' : error.variant === 'warning' ? 'Предупреждение' : 'Информация'}
+            </AlertTitle>
+            <AlertDescription>{error.message}</AlertDescription>
+          </Alert>
         )}
 
         {/* Блок статуса процесса */}

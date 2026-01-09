@@ -127,8 +127,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!response.ok) {
+      // Для ошибок загрузки статьи возвращаем понятное сообщение
+      if (response.status === 404 || response.status === 500 || response.status >= 500) {
+        return NextResponse.json(
+          { error: 'Не удалось загрузить статью по этой ссылке.' },
+          { status: response.status }
+        )
+      }
       return NextResponse.json(
-        { error: `HTTP ${response.status}: ${response.statusText}` },
+        { error: `Не удалось загрузить статью. HTTP ${response.status}: ${response.statusText}` },
         { status: response.status }
       )
     }
