@@ -144,6 +144,7 @@ function getFriendlyErrorMessage(error: any, actionType: ActionType, statusCode?
 export default function Home() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionType, setActionType] = useState<ActionType>(null)
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
@@ -198,6 +199,7 @@ export default function Home() {
     setLoading(true)
     setActionType('parse')
     setResult('')
+    setImageUrl(null)
     setParsedData(null)
     setError(null)
 
@@ -249,6 +251,7 @@ export default function Home() {
     setLoading(true)
     setActionType('translate')
     setResult('')
+    setImageUrl(null)
     setError(null)
 
     try {
