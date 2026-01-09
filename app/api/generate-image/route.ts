@@ -47,9 +47,11 @@ export async function POST(request: NextRequest) {
     
     let response: Response | null = null
     let lastError: any = null
+    let lastUsedUrl: string = ''
     
     // Пробуем каждый URL по очереди
     for (const apiUrl of apiUrls) {
+      lastUsedUrl = apiUrl
       try {
         console.log('Попытка запроса к:', apiUrl)
         response = await fetch(apiUrl, {
@@ -137,7 +139,7 @@ export async function POST(request: NextRequest) {
       }
       
       console.error('Полная информация об ошибке:', {
-        url: apiUrl,
+        url: lastUsedUrl || 'unknown',
         status: response.status,
         errorData: errorData
       })
