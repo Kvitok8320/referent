@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
     
     console.log('Отправка запроса на генерацию изображения в Hugging Face, модель:', model)
 
-    const response = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+    // Используем новый endpoint router.huggingface.co вместо api-inference.huggingface.co
+    const response = await fetch(`https://router.huggingface.co/models/${model}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
