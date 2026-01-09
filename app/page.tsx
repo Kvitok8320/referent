@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | null
+type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | 'translate' | null
 
 interface ParsedData {
   date: string | null
@@ -57,6 +57,45 @@ export default function Home() {
       setResult(JSON.stringify(data, null, 2))
     } catch (error) {
       console.error('Ошибка в handleParse:', error)
+      setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleTranslate = async () => {
+    if (!parsedData || !parsedData.content) {
+      alert('Сначала распарсите статью, чтобы получить контент для перевода')
+      return
+    }
+
+    setLoading(true)
+    setActionType('translate')
+    setResult('')
+
+    try {
+      console.log('Отправка запроса на перевод')
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: parsedData.content }),
+      })
+
+      console.log('Ответ получен, status:', response.status)
+
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('Ошибка API:', error)
+        throw new Error(error.error || 'Failed to translate article')
+      }
+
+      const data = await response.json()
+      console.log('Перевод получен')
+      setResult(data.translation || 'Перевод не получен')
+    } catch (error) {
+      console.error('Ошибка в handleTranslate:', error)
       setResult(`Ошибка: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
     } finally {
       setLoading(false)
@@ -124,6 +163,21 @@ export default function Home() {
           </button>
         </div>
 
+        {/* Кнопка перевода */}
+        {parsedData && parsedData.content && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">Перевод статьи:</h2>
+            <button
+              type="button"
+              onClick={handleTranslate}
+              disabled={loading}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
+            >
+              {loading && actionType === 'translate' ? 'Перевод...' : 'Перевести статью'}
+            </button>
+          </div>
+        )}
+
         {/* Кнопки действий */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Выберите действие:</h2>
@@ -156,6 +210,7 @@ export default function Home() {
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">
             {actionType === 'parse' && 'Результат парсинга'}
+            {actionType === 'translate' && 'Перевод статьи'}
             {actionType === 'summary' && 'О чем статья?'}
             {actionType === 'theses' && 'Тезисы'}
             {actionType === 'telegram' && 'Пост для Telegram'}
