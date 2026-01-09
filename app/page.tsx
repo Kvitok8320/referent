@@ -326,15 +326,15 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-6 sm:py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">
             Анализ статей
           </h1>
           <button
             onClick={handleClear}
-            className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors shadow-md hover:shadow-lg"
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors shadow-md hover:shadow-lg w-full sm:w-auto"
             title="Очистить все поля и результаты"
           >
             Очистить
@@ -342,7 +342,7 @@ export default function Home() {
         </div>
 
         {/* Поле ввода URL */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
           <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
             URL англоязычной статьи
           </label>
@@ -356,7 +356,7 @@ export default function Home() {
                 handleParse()
               }
             }}
-            placeholder="Введите URL статьи, например: https://example.com/article"
+            placeholder="https://example.com/article"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
           <p className="mt-2 text-xs text-gray-500">
@@ -365,8 +365,8 @@ export default function Home() {
         </div>
 
         {/* Кнопка парсинга */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">Парсинг статьи:</h2>
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">Парсинг статьи:</h2>
           <button
             type="button"
             onClick={(e) => {
@@ -383,8 +383,8 @@ export default function Home() {
 
         {/* Кнопка перевода */}
         {parsedData && parsedData.content && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">Перевод статьи:</h2>
+          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">Перевод статьи:</h2>
             <button
               type="button"
               onClick={handleTranslate}
@@ -399,9 +399,9 @@ export default function Home() {
 
         {/* Кнопки действий */}
         {parsedData && parsedData.content && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">Выберите действие:</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">Выберите действие:</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <button
                 onClick={() => handleAction('summary')}
                 disabled={loading}
@@ -432,7 +432,7 @@ export default function Home() {
 
         {/* Блок ошибок */}
         {error && (
-          <Alert variant={error.variant} className="mb-6">
+          <Alert variant={error.variant} className="mb-4 sm:mb-6 p-4">
             <AlertTitle className="mb-1">
               {error.variant === 'destructive' ? 'Ошибка' : error.variant === 'warning' ? 'Предупреждение' : 'Информация'}
             </AlertTitle>
@@ -442,7 +442,7 @@ export default function Home() {
 
         {/* Блок статуса процесса */}
         {loading && actionType && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
               <span className="text-blue-700 text-sm font-medium">
@@ -457,9 +457,9 @@ export default function Home() {
         )}
 
         {/* Блок отображения результата */}
-        <div ref={resultRef} className="bg-white rounded-lg shadow-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-700">
+        <div ref={resultRef} className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-700">
               {actionType === 'parse' && 'Результат парсинга'}
               {actionType === 'translate' && 'Перевод статьи'}
               {actionType === 'summary' && 'О чем статья?'}
@@ -470,18 +470,18 @@ export default function Home() {
             {result && !loading && (
               <button
                 onClick={handleCopy}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg text-sm"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg text-sm w-full sm:w-auto"
                 title="Копировать результат в буфер обмена"
               >
                 Копировать
               </button>
             )}
           </div>
-          <div className="min-h-[200px] p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="min-h-[200px] p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
             {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                <span className="ml-4 text-gray-600">
+              <div className="flex flex-col sm:flex-row items-center justify-center h-full gap-3 sm:gap-4">
+                <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-indigo-600"></div>
+                <span className="text-sm sm:text-base text-gray-600 text-center sm:text-left">
                   {actionType === 'summary' && 'Генерация краткого содержания...'}
                   {actionType === 'theses' && 'Генерация тезисов...'}
                   {actionType === 'telegram' && 'Генерация Telegram-поста...'}
@@ -493,15 +493,15 @@ export default function Home() {
             ) : result ? (
               <div className="text-gray-700">
                 {actionType === 'parse' ? (
-                  <pre className="bg-white p-4 rounded border overflow-auto max-h-[500px] text-sm">
+                  <pre className="bg-white p-3 sm:p-4 rounded border overflow-auto max-h-[500px] text-xs sm:text-sm break-words">
                     {result}
                   </pre>
                 ) : (
-                  <div className="whitespace-pre-wrap">{result}</div>
+                  <div className="whitespace-pre-wrap break-words text-sm sm:text-base">{result}</div>
                 )}
               </div>
             ) : (
-              <div className="text-gray-400 text-center py-12">
+              <div className="text-gray-400 text-center py-8 sm:py-12 text-sm sm:text-base px-2">
                 Выберите действие для отображения результата
               </div>
             )}
