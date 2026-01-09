@@ -78,24 +78,59 @@ function getFriendlyErrorMessage(error: any, actionType: ActionType, statusCode?
   if (actionType === 'image') {
     if (statusCode === 401) {
       return {
-        message: 'Ошибка авторизации. Проверьте настройки API.',
+        message: 'Неверный API ключ Hugging Face. Проверьте правильность ключа в настройках Vercel (Environment Variables).',
         variant: 'destructive'
       }
     }
     if (statusCode === 503) {
       return {
-        message: 'Модель генерации изображений загружается. Подождите немного и попробуйте снова.',
+        message: 'Модель генерации изображений загружается. Подождите 10-20 секунд и попробуйте снова.',
         variant: 'warning'
       }
     }
     if (statusCode === 429) {
       return {
-        message: 'Превышен лимит запросов. Подождите немного и попробуйте снова.',
+        message: 'Превышен лимит запросов к Hugging Face API. Подождите немного и попробуйте снова.',
         variant: 'warning'
       }
     }
+    // Проверяем конкретные сообщения об ошибках от API
+    if (error?.error) {
+      const errorMsg = String(error.error).toLowerCase()
+      if (errorMsg.includes('model') && errorMsg.includes('loading')) {
+        return {
+          message: 'Модель загружается. Подождите 10-20 секунд и попробуйте снова.',
+          variant: 'warning'
+        }
+      }
+      if (errorMsg.includes('unauthorized') || errorMsg.includes('authentication')) {
+        return {
+          message: 'Неверный API ключ Hugging Face. Проверьте настройки в Vercel.',
+          variant: 'destructive'
+        }
+      }
+      return {
+        message: `Ошибка Hugging Face: ${error.error}`,
+        variant: 'destructive'
+      }
+    }
+    if (error?.message) {
+      const errorMsg = String(error.message).toLowerCase()
+      if (errorMsg.includes('api ключ') || errorMsg.includes('api key')) {
+        return {
+          message: error.message,
+          variant: 'destructive'
+        }
+      }
+      if (errorMsg.includes('неожиданный формат') || errorMsg.includes('unexpected format')) {
+        return {
+          message: 'Модель недоступна или вернула неожиданный ответ. Попробуйте позже.',
+          variant: 'warning'
+        }
+      }
+    }
     return {
-      message: 'Не удалось сгенерировать изображение. Попробуйте еще раз.',
+      message: 'Не удалось сгенерировать изображение. Проверьте логи в консоли браузера (F12) для деталей.',
       variant: 'destructive'
     }
   }
@@ -398,7 +433,8 @@ export default function Home() {
       const promptData = await promptResponse.json()
       const imagePrompt = promptData.prompt
 
-      if (!imagePrompt) {
+      if (!imagePrompt || typeof imagePrompt !== 'string' || imagePrompt.trim().length === 0) {
+        console.error('Промпт не получен или пустой:', promptData)
         setError({
           message: 'Не удалось сгенерировать промпт для изображения. Попробуйте еще раз.',
           variant: 'destructive'
@@ -406,7 +442,7 @@ export default function Home() {
         return
       }
 
-      console.log('Промпт получен, генерация изображения')
+      console.log('Промпт получен, длина:', imagePrompt.length, 'символов. Начало промпта:', imagePrompt.substring(0, 100))
 
       // Шаг 2: Генерация изображения
       const imageResponse = await fetch('/api/generate-image', {
@@ -422,17 +458,37 @@ export default function Home() {
         try {
           errorData = await imageResponse.json()
         } catch (e) {
-          // Если не удалось распарсить JSON
+          // Если не удалось распарсить JSON, пробуем получить текст
+          try {
+            const text = await imageResponse.text()
+            errorData = { message: text || `HTTP ${imageResponse.status}: ${imageResponse.statusText}` }
+          } catch (textError) {
+            errorData = { message: `HTTP ${imageResponse.status}: ${imageResponse.statusText}` }
+          }
         }
-        console.error('Ошибка API изображения:', errorData)
+        console.error('Ошибка API изображения:', {
+          status: imageResponse.status,
+          statusText: imageResponse.statusText,
+          errorData: errorData
+        })
         const friendlyError = getFriendlyErrorMessage(errorData, 'image', imageResponse.status)
         setError(friendlyError)
         return
       }
 
       const imageData = await imageResponse.json()
-      console.log('Изображение получено')
-      setImageUrl(imageData.image || null)
+      console.log('Изображение получено, размер данных:', imageData.image ? imageData.image.length : 0)
+      
+      if (!imageData.image) {
+        console.error('Изображение не получено в ответе:', imageData)
+        setError({
+          message: 'Изображение не было сгенерировано. Попробуйте еще раз.',
+          variant: 'destructive'
+        })
+        return
+      }
+      
+      setImageUrl(imageData.image)
       setError(null)
     } catch (error) {
       console.error('Ошибка в handleImage:', error)
