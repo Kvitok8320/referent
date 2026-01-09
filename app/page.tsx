@@ -184,9 +184,12 @@ export default function Home() {
                 handleParse()
               }
             }}
-            placeholder="https://example.com/article"
+            placeholder="Введите URL статьи, например: https://example.com/article"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
           />
+          <p className="mt-2 text-xs text-gray-500">
+            Укажите ссылку на англоязычную статью
+          </p>
         </div>
 
         {/* Кнопка парсинга */}
@@ -199,6 +202,7 @@ export default function Home() {
               handleParse(e)
             }}
             disabled={loading}
+            title="Извлекает заголовок, дату публикации и основной контент из статьи по указанному URL"
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
           >
             {loading && actionType === 'parse' ? 'Парсинг...' : 'Распарсить статью'}
@@ -213,6 +217,7 @@ export default function Home() {
               type="button"
               onClick={handleTranslate}
               disabled={loading}
+              title="Переводит распарсенную статью с английского языка на русский с сохранением структуры и стиля"
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
             >
               {loading && actionType === 'translate' ? 'Перевод...' : 'Перевести статью'}
@@ -228,6 +233,7 @@ export default function Home() {
               <button
                 onClick={() => handleAction('summary')}
                 disabled={loading}
+                title="Генерирует краткое содержание статьи на русском языке (2-3 абзаца) с основными идеями"
                 className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
               >
                 {loading && actionType === 'summary' ? 'Генерация...' : 'О чем статья?'}
@@ -235,6 +241,7 @@ export default function Home() {
               <button
                 onClick={() => handleAction('theses')}
                 disabled={loading}
+                title="Извлекает ключевые тезисы из статьи и представляет их в виде нумерованного списка на русском языке"
                 className="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
               >
                 {loading && actionType === 'theses' ? 'Генерация...' : 'Тезисы'}
@@ -242,10 +249,27 @@ export default function Home() {
               <button
                 onClick={() => handleAction('telegram')}
                 disabled={loading}
+                title="Создает привлекательный пост для Telegram-канала с эмодзи, структурированным текстом и призывом к действию"
                 className="px-6 py-3 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
               >
                 {loading && actionType === 'telegram' ? 'Генерация...' : 'Пост для Telegram'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Блок статуса процесса */}
+        {loading && actionType && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+              <span className="text-blue-700 text-sm font-medium">
+                {actionType === 'parse' && 'Загружаю статью...'}
+                {actionType === 'translate' && 'Перевожу статью...'}
+                {actionType === 'summary' && 'Генерирую краткое содержание...'}
+                {actionType === 'theses' && 'Генерирую тезисы...'}
+                {actionType === 'telegram' && 'Создаю Telegram-пост...'}
+              </span>
             </div>
           </div>
         )}
