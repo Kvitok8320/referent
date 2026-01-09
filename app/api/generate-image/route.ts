@@ -41,10 +41,25 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'No error data from Hugging Face' }))
+      let errorData: any = {}
+      const contentType = response.headers.get('content-type')
+      
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json()
+        } else {
+          const text = await response.text()
+          errorData = { message: text || 'Unknown error from Hugging Face' }
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+        errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+      }
+      
       console.error('Hugging Face API error:', {
         status: response.status,
         statusText: response.statusText,
+        contentType: contentType,
         errorData: errorData
       })
       
@@ -53,8 +68,14 @@ export async function POST(request: NextRequest) {
         errorMessage = 'Неверный API ключ Hugging Face. Проверьте правильность ключа в .env.local'
       } else if (response.status === 503) {
         errorMessage = 'Модель загружается. Подождите немного и попробуйте снова.'
+      } else if (response.status === 429) {
+        errorMessage = 'Превышен лимит запросов к Hugging Face API. Попробуйте позже.'
       } else if (errorData.error) {
         errorMessage = `Ошибка Hugging Face: ${errorData.error}`
+      } else if (errorData.message) {
+        errorMessage = `Ошибка Hugging Face: ${errorData.message}`
+      } else if (typeof errorData === 'string') {
+        errorMessage = `Ошибка Hugging Face: ${errorData}`
       }
       
       return NextResponse.json(
@@ -63,8 +84,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Проверяем, что ответ действительно содержит изображение
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.startsWith('image/')) {
+      const errorText = await response.text().catch(() => 'Unknown error')
+      console.error('Hugging Face returned non-image response:', {
+        contentType: contentType,
+        responsePreview: errorText.substring(0, 200)
+      })
+      return NextResponse.json(
+        { error: 'Hugging Face API вернул неожиданный формат ответа. Возможно, модель недоступна или произошла ошибка.' },
+        { status: 500 }
+      )
+    }
+    
     // Hugging Face возвращает изображение в формате blob
     const imageBlob = await response.blob()
+    
+    // Проверяем размер изображения
+    if (imageBlob.size === 0) {
+      console.error('Hugging Face returned empty image blob')
+      return NextResponse.json(
+        { error: 'Получено пустое изображение от Hugging Face API. Попробуйте еще раз.' },
+        { status: 500 }
+      )
+    }
     
     // Конвертируем blob в base64 для отправки клиенту
     const arrayBuffer = await imageBlob.arrayBuffer()
@@ -73,7 +117,7 @@ export async function POST(request: NextRequest) {
     const mimeType = imageBlob.type || 'image/png'
     const dataUrl = `data:${mimeType};base64,${base64Image}`
 
-    console.log('Изображение успешно сгенерировано.')
+    console.log('Изображение успешно сгенерировано. Размер:', imageBlob.size, 'байт, тип:', mimeType)
 
     return NextResponse.json({
       image: dataUrl
