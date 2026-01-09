@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 
 type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | 'translate' | null
@@ -122,6 +122,40 @@ export default function Home() {
   const [actionType, setActionType] = useState<ActionType>(null)
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
   const [error, setError] = useState<ErrorState | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+
+  // Функция для очистки всех состояний
+  const handleClear = () => {
+    setUrl('')
+    setResult('')
+    setLoading(false)
+    setActionType(null)
+    setParsedData(null)
+    setError(null)
+  }
+
+  // Функция для копирования результата в буфер обмена
+  const handleCopy = async () => {
+    if (!result) return
+    
+    try {
+      await navigator.clipboard.writeText(result)
+      // Можно добавить уведомление об успешном копировании
+      alert('Результат скопирован в буфер обмена')
+    } catch (err) {
+      console.error('Ошибка при копировании:', err)
+      alert('Не удалось скопировать результат')
+    }
+  }
+
+  // Автоматическая прокрутка к результатам после успешной генерации
+  useEffect(() => {
+    if (result && !loading && resultRef.current) {
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [result, loading])
 
   const handleParse = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault()
@@ -294,9 +328,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-center text-gray-800 mb-8">
-          Анализ статей
-        </h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800">
+            Анализ статей
+          </h1>
+          <button
+            onClick={handleClear}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors shadow-md hover:shadow-lg"
+            title="Очистить все поля и результаты"
+          >
+            Очистить
+          </button>
+        </div>
 
         {/* Поле ввода URL */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -414,15 +457,26 @@ export default function Home() {
         )}
 
         {/* Блок отображения результата */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">
-            {actionType === 'parse' && 'Результат парсинга'}
-            {actionType === 'translate' && 'Перевод статьи'}
-            {actionType === 'summary' && 'О чем статья?'}
-            {actionType === 'theses' && 'Тезисы'}
-            {actionType === 'telegram' && 'Пост для Telegram'}
-            {!actionType && 'Результат'}
-          </h2>
+        <div ref={resultRef} className="bg-white rounded-lg shadow-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-700">
+              {actionType === 'parse' && 'Результат парсинга'}
+              {actionType === 'translate' && 'Перевод статьи'}
+              {actionType === 'summary' && 'О чем статья?'}
+              {actionType === 'theses' && 'Тезисы'}
+              {actionType === 'telegram' && 'Пост для Telegram'}
+              {!actionType && 'Результат'}
+            </h2>
+            {result && !loading && (
+              <button
+                onClick={handleCopy}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg text-sm"
+                title="Копировать результат в буфер обмена"
+              >
+                Копировать
+              </button>
+            )}
+          </div>
           <div className="min-h-[200px] p-4 bg-gray-50 rounded-lg border border-gray-200">
             {loading ? (
               <div className="flex items-center justify-center h-full">
