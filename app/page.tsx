@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Alert, AlertDescription, AlertTitle } from './components/ui/alert'
 
-type ActionType = 'summary' | 'theses' | 'telegram' | 'parse' | 'translate' | null
+type ActionType = 'summary' | 'theses' | 'telegram' | 'image' | 'parse' | 'translate' | null
 
 interface ParsedData {
   date: string | null
@@ -74,6 +74,32 @@ function getFriendlyErrorMessage(error: any, actionType: ActionType, statusCode?
     }
   }
 
+  // Ошибки генерации изображения
+  if (actionType === 'image') {
+    if (statusCode === 401) {
+      return {
+        message: 'Ошибка авторизации. Проверьте настройки API.',
+        variant: 'destructive'
+      }
+    }
+    if (statusCode === 503) {
+      return {
+        message: 'Модель генерации изображений загружается. Подождите немного и попробуйте снова.',
+        variant: 'warning'
+      }
+    }
+    if (statusCode === 429) {
+      return {
+        message: 'Превышен лимит запросов. Подождите немного и попробуйте снова.',
+        variant: 'warning'
+      }
+    }
+    return {
+      message: 'Не удалось сгенерировать изображение. Попробуйте еще раз.',
+      variant: 'destructive'
+    }
+  }
+
   // Ошибки генерации контента
   if (actionType === 'summary' || actionType === 'theses' || actionType === 'telegram') {
     if (statusCode === 401) {
@@ -128,6 +154,7 @@ export default function Home() {
   const handleClear = () => {
     setUrl('')
     setResult('')
+    setImageUrl(null)
     setLoading(false)
     setActionType(null)
     setParsedData(null)
@@ -150,12 +177,12 @@ export default function Home() {
 
   // Автоматическая прокрутка к результатам после успешной генерации
   useEffect(() => {
-    if (result && !loading && resultRef.current) {
+    if ((result || imageUrl) && !loading && resultRef.current) {
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
     }
-  }, [result, loading])
+  }, [result, imageUrl, loading])
 
   const handleParse = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault()
@@ -271,6 +298,7 @@ export default function Home() {
     setLoading(true)
     setActionType(type)
     setResult('')
+    setImageUrl(null)
     setError(null)
 
     try {
@@ -319,6 +347,93 @@ export default function Home() {
     } catch (error) {
       console.error(`Ошибка в handleAction (${type}):`, error)
       const friendlyError = getFriendlyErrorMessage(error, type)
+      setError(friendlyError)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleImage = async () => {
+    if (!parsedData?.content) {
+      alert('Сначала распарсите статью, чтобы получить контент для генерации изображения')
+      return
+    }
+
+    setLoading(true)
+    setActionType('image')
+    setResult('')
+    setImageUrl(null)
+    setError(null)
+
+    try {
+      // Шаг 1: Генерация промпта для изображения
+      console.log('Генерация промпта для изображения')
+      const promptResponse = await fetch('/api/image-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          content: parsedData.content,
+          title: parsedData.title || null
+        }),
+      })
+
+      if (!promptResponse.ok) {
+        let errorData: any = {}
+        try {
+          errorData = await promptResponse.json()
+        } catch (e) {
+          // Если не удалось распарсить JSON
+        }
+        console.error('Ошибка API промпта:', errorData)
+        const friendlyError = getFriendlyErrorMessage(errorData, 'image', promptResponse.status)
+        setError(friendlyError)
+        return
+      }
+
+      const promptData = await promptResponse.json()
+      const imagePrompt = promptData.prompt
+
+      if (!imagePrompt) {
+        setError({
+          message: 'Не удалось сгенерировать промпт для изображения. Попробуйте еще раз.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      console.log('Промпт получен, генерация изображения')
+
+      // Шаг 2: Генерация изображения
+      const imageResponse = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: imagePrompt }),
+      })
+
+      if (!imageResponse.ok) {
+        let errorData: any = {}
+        try {
+          errorData = await imageResponse.json()
+        } catch (e) {
+          // Если не удалось распарсить JSON
+        }
+        console.error('Ошибка API изображения:', errorData)
+        const friendlyError = getFriendlyErrorMessage(errorData, 'image', imageResponse.status)
+        setError(friendlyError)
+        return
+      }
+
+      const imageData = await imageResponse.json()
+      console.log('Изображение получено')
+      setImageUrl(imageData.image || null)
+      setError(null)
+    } catch (error) {
+      console.error('Ошибка в handleImage:', error)
+      const friendlyError = getFriendlyErrorMessage(error, 'image')
       setError(friendlyError)
     } finally {
       setLoading(false)
@@ -401,7 +516,7 @@ export default function Home() {
         {parsedData && parsedData.content && (
           <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
             <h2 className="text-base sm:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">Выберите действие:</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <button
                 onClick={() => handleAction('summary')}
                 disabled={loading}
@@ -425,6 +540,14 @@ export default function Home() {
                 className="px-6 py-3 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
               >
                 {loading && actionType === 'telegram' ? 'Генерация...' : 'Пост для Telegram'}
+              </button>
+              <button
+                onClick={handleImage}
+                disabled={loading}
+                title="Генерирует иллюстрацию к статье на основе ее содержания с помощью AI"
+                className="px-6 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
+              >
+                {loading && actionType === 'image' ? 'Генерация...' : 'Иллюстрация'}
               </button>
             </div>
           </div>
@@ -451,6 +574,7 @@ export default function Home() {
                 {actionType === 'summary' && 'Генерирую краткое содержание...'}
                 {actionType === 'theses' && 'Генерирую тезисы...'}
                 {actionType === 'telegram' && 'Создаю Telegram-пост...'}
+                {actionType === 'image' && 'Генерирую иллюстрацию...'}
               </span>
             </div>
           </div>
@@ -465,9 +589,10 @@ export default function Home() {
               {actionType === 'summary' && 'О чем статья?'}
               {actionType === 'theses' && 'Тезисы'}
               {actionType === 'telegram' && 'Пост для Telegram'}
+              {actionType === 'image' && 'Иллюстрация'}
               {!actionType && 'Результат'}
             </h2>
-            {result && !loading && (
+            {result && !loading && actionType !== 'image' && (
               <button
                 onClick={handleCopy}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg text-sm w-full sm:w-auto"
@@ -487,8 +612,24 @@ export default function Home() {
                   {actionType === 'telegram' && 'Генерация Telegram-поста...'}
                   {actionType === 'parse' && 'Парсинг статьи...'}
                   {actionType === 'translate' && 'Перевод статьи...'}
+                  {actionType === 'image' && 'Генерация иллюстрации...'}
                   {!actionType && 'Генерация результата...'}
                 </span>
+              </div>
+            ) : imageUrl ? (
+              <div className="flex flex-col items-center justify-center p-2">
+                <img 
+                  src={imageUrl} 
+                  alt="Сгенерированная иллюстрация к статье" 
+                  className="max-w-full h-auto rounded-lg shadow-md mb-4 w-full sm:max-w-2xl"
+                />
+                <a
+                  href={imageUrl}
+                  download="illustration.png"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg text-sm w-full sm:w-auto text-center"
+                >
+                  Скачать изображение
+                </a>
               </div>
             ) : result ? (
               <div className="text-gray-700">
