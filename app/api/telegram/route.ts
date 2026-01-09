@@ -13,7 +13,16 @@ export async function POST(request: NextRequest) {
     if (!content || typeof content !== 'string') {
       console.error('Ошибка: Content is required for telegram post')
       return NextResponse.json(
-        { error: 'Content is required' },
+        { error: 'Необходимо предоставить контент статьи для генерации Telegram-поста' },
+        { status: 400 }
+      )
+    }
+
+    // Проверяем, что контент не пустой после обрезки пробелов
+    const trimmedContent = content.trim()
+    if (trimmedContent.length === 0) {
+      return NextResponse.json(
+        { error: 'Контент статьи пуст. Сначала распарсите статью.' },
         { status: 400 }
       )
     }
@@ -22,13 +31,21 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       console.error('Ошибка: OpenRouter API key is not configured')
       return NextResponse.json(
-        { error: 'OpenRouter API key is not configured' },
+        { error: 'API ключ OpenRouter не настроен. Добавьте OPENROUTER_API_KEY в файл .env.local и перезапустите сервер.' },
         { status: 500 }
       )
     }
 
     // Ограничиваем длину контента для генерации Telegram-поста (чтобы не превысить лимиты токенов)
-    const contentForPost = content.substring(0, 10000) // Ограничиваем до 10000 символов
+    const contentForPost = trimmedContent.substring(0, 10000) // Ограничиваем до 10000 символов
+    
+    if (contentForPost.length < 50) {
+      return NextResponse.json(
+        { error: 'Контент статьи слишком короткий для генерации Telegram-поста (минимум 50 символов)' },
+        { status: 400 }
+      )
+    }
+    
     console.log('Отправка запроса на генерацию Telegram-поста в OpenRouter, длина контента:', contentForPost.length)
 
     // Формируем промпт с учетом title и date, если они предоставлены
@@ -73,8 +90,19 @@ export async function POST(request: NextRequest) {
         statusText: response.statusText,
         errorData: errorData
       })
+      let errorMessage = 'Ошибка при обращении к OpenRouter API'
+      if (response.status === 401) {
+        errorMessage = 'Неверный API ключ OpenRouter. Проверьте правильность ключа в .env.local'
+      } else if (response.status === 429) {
+        errorMessage = 'Превышен лимит запросов к OpenRouter API. Попробуйте позже'
+      } else if (response.status === 500) {
+        errorMessage = 'Внутренняя ошибка OpenRouter API. Попробуйте позже'
+      } else if (errorData.error?.message) {
+        errorMessage = `Ошибка OpenRouter: ${errorData.error.message}`
+      }
+      
       return NextResponse.json(
-        { error: `OpenRouter API error: ${response.statusText} - ${errorData.message || JSON.stringify(errorData)}` },
+        { error: errorMessage },
         { status: response.status }
       )
     }
@@ -84,12 +112,19 @@ export async function POST(request: NextRequest) {
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('Invalid response from OpenRouter API:', data)
       return NextResponse.json(
-        { error: 'Invalid response from OpenRouter API' },
+        { error: 'Получен некорректный ответ от OpenRouter API. Попробуйте еще раз.' },
         { status: 500 }
       )
     }
-
+    
     const postText = data.choices[0].message.content
+    if (!postText || postText.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Не удалось сгенерировать Telegram-пост. Попробуйте еще раз.' },
+        { status: 500 }
+      )
+    }
+    
     console.log('Telegram-пост успешно получен.')
 
     return NextResponse.json({

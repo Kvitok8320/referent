@@ -138,9 +138,16 @@ export default function Home() {
       console.log('Ответ получен, status:', response.status)
 
       if (!response.ok) {
-        const error = await response.json()
-        console.error('Ошибка API:', error)
-        throw new Error(error.error || 'Failed to process')
+        let errorMessage = 'Ошибка при обработке запроса'
+        try {
+          const error = await response.json()
+          errorMessage = error.error || `Ошибка ${response.status}: ${response.statusText}`
+          console.error('Ошибка API:', error)
+        } catch (e) {
+          errorMessage = `Ошибка ${response.status}: ${response.statusText}`
+          console.error('Не удалось прочитать ошибку:', e)
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()

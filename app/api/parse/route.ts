@@ -10,13 +10,21 @@ export async function POST(request: NextRequest) {
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
-        { error: 'URL is required' },
+        { error: 'URL обязателен для парсинга статьи' },
         { status: 400 }
       )
     }
 
     // Валидация и нормализация URL
     let normalizedUrl = url.trim()
+    
+    // Проверяем, что URL не пустой после обрезки пробелов
+    if (!normalizedUrl || normalizedUrl.length === 0) {
+      return NextResponse.json(
+        { error: 'URL не может быть пустым. Пожалуйста, введите корректный URL статьи.' },
+        { status: 400 }
+      )
+    }
     try {
       const urlObj = new URL(normalizedUrl)
       // Проверяем, что это http или https

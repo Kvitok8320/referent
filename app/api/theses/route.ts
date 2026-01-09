@@ -9,7 +9,16 @@ export async function POST(request: NextRequest) {
     if (!content || typeof content !== 'string') {
       console.error('Ошибка: Content is required for theses')
       return NextResponse.json(
-        { error: 'Content is required' },
+        { error: 'Необходимо предоставить контент статьи для генерации тезисов' },
+        { status: 400 }
+      )
+    }
+
+    // Проверяем, что контент не пустой после обрезки пробелов
+    const trimmedContent = content.trim()
+    if (trimmedContent.length === 0) {
+      return NextResponse.json(
+        { error: 'Контент статьи пуст. Сначала распарсите статью.' },
         { status: 400 }
       )
     }
@@ -18,13 +27,21 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       console.error('Ошибка: OpenRouter API key is not configured')
       return NextResponse.json(
-        { error: 'OpenRouter API key is not configured' },
+        { error: 'API ключ OpenRouter не настроен. Добавьте OPENROUTER_API_KEY в файл .env.local и перезапустите сервер.' },
         { status: 500 }
       )
     }
 
     // Ограничиваем длину контента для генерации тезисов (чтобы не превысить лимиты токенов)
-    const contentForTheses = content.substring(0, 8000) // Ограничиваем до 8000 символов
+    const contentForTheses = trimmedContent.substring(0, 8000) // Ограничиваем до 8000 символов
+    
+    if (contentForTheses.length < 50) {
+      return NextResponse.json(
+        { error: 'Контент статьи слишком короткий для генерации тезисов (минимум 50 символов)' },
+        { status: 400 }
+      )
+    }
+    
     console.log('Отправка запроса на генерацию тезисов в OpenRouter, длина контента:', contentForTheses.length)
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -59,8 +76,19 @@ export async function POST(request: NextRequest) {
         statusText: response.statusText,
         errorData: errorData
       })
+      let errorMessage = 'Ошибка при обращении к OpenRouter API'
+      if (response.status === 401) {
+        errorMessage = 'Неверный API ключ OpenRouter. Проверьте правильность ключа в .env.local'
+      } else if (response.status === 429) {
+        errorMessage = 'Превышен лимит запросов к OpenRouter API. Попробуйте позже'
+      } else if (response.status === 500) {
+        errorMessage = 'Внутренняя ошибка OpenRouter API. Попробуйте позже'
+      } else if (errorData.error?.message) {
+        errorMessage = `Ошибка OpenRouter: ${errorData.error.message}`
+      }
+      
       return NextResponse.json(
-        { error: `OpenRouter API error: ${response.statusText} - ${errorData.message || JSON.stringify(errorData)}` },
+        { error: errorMessage },
         { status: response.status }
       )
     }
@@ -70,12 +98,19 @@ export async function POST(request: NextRequest) {
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('Invalid response from OpenRouter API:', data)
       return NextResponse.json(
-        { error: 'Invalid response from OpenRouter API' },
+        { error: 'Получен некорректный ответ от OpenRouter API. Попробуйте еще раз.' },
         { status: 500 }
       )
     }
-
+    
     const thesesText = data.choices[0].message.content
+    if (!thesesText || thesesText.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Не удалось сгенерировать тезисы. Попробуйте еще раз.' },
+        { status: 500 }
+      )
+    }
+    
     console.log('Тезисы успешно получены.')
 
     return NextResponse.json({
