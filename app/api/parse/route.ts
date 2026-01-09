@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-<<<<<<< HEAD
 import * as cheerio from 'cheerio'
 
 export async function POST(request: NextRequest) {
@@ -8,13 +7,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('Тело запроса:', body)
     const { url } = body
-=======
-import cheerio from 'cheerio'
-
-export async function POST(request: NextRequest) {
-  try {
-    const { url } = await request.json()
->>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
@@ -23,7 +15,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-<<<<<<< HEAD
     // Валидация и нормализация URL
     let normalizedUrl = url.trim()
     try {
@@ -130,18 +121,6 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       return NextResponse.json(
         { error: `HTTP ${response.status}: ${response.statusText}` },
-=======
-    // Получаем HTML страницы
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    })
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch URL: ${response.statusText}` },
->>>>>>> d3f1b3ac91e9af0e64bc8192de0f6cd562b84ac5
         { status: response.status }
       )
     }
@@ -259,4 +238,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
